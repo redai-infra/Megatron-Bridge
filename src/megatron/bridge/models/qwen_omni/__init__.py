@@ -11,29 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Megatron Bridge - A component of the Megatron ecosystem."""
 
-from megatron.bridge.models.conversion.auto_bridge import AutoBridge
-from megatron.bridge.package_info import (
-    __contact_emails__,
-    __contact_names__,
-    __download_url__,
-    __homepage__,
-    __package_name__,
-    __repository_url__,
-    __version__,
-)
+"""Qwen3 Omni model providers and configurations."""
+
+# Core model components
+# Bridges for HuggingFace to Megatron conversion
+from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.model import Qwen3OmniMoeModel  # noqa: F401
+from megatron.bridge.models.qwen_omni.qwen3_omni_bridge import Qwen3OmniMoEBridge
+
+# Dense and MoE model providers
+from megatron.bridge.models.qwen_omni.qwen3_omni_provider import Qwen3OmniModelProvider
 
 
 __all__ = [
-    "__version__",
-    "__package_name__",
-    "__contact_names__",
-    "__contact_emails__",
-    "__homepage__",
-    "__repository_url__",
-    "__download_url__",
-    "AutoBridge",
+    "Qwen3OmniMoeModel",
+    "Qwen3OmniMoEBridge",
+    "Qwen3OmniModelProvider",
 ]
-
-print("my new megatron bridge ...", flush=True)
