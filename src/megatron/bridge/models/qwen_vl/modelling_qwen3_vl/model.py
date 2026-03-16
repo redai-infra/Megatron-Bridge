@@ -244,10 +244,20 @@ class Qwen3VLModel(MegatronModule):
 
             vision_embeds = None
             if vision_grid_thw is not None and vision_grid_thw.shape[0] > 0:
-                vision_embeds, deepstack_feature_lists = self.vision_model(
+                vision_outputs = self.vision_model(
                     hidden_states=vision_data,
                     grid_thw=vision_grid_thw,
                 )
+
+                import transformers
+                from packaging import version
+
+                if version.parse(transformers.__version__) >= version.parse("5.0.0"):
+                    vision_embeds = vision_outputs.pooler_output
+                    deepstack_feature_lists = vision_outputs.deepstack_features
+                else:
+                    vision_embeds, deepstack_feature_lists = vision_outputs
+
             combined_embeddings = self.language_model.embedding(
                 input_ids=input_ids,
                 position_ids=None,  # NOTE: disable
@@ -273,7 +283,7 @@ class Qwen3VLModel(MegatronModule):
                     combined_embeddings = combined_embeddings.transpose(0, 1).contiguous()
                     combined_embeddings[image_mask] = image_embeds
                     combined_embeddings = combined_embeddings.transpose(0, 1).contiguous()
-                    
+
                 if video_embeds is not None:
                     combined_embeddings = combined_embeddings.transpose(0, 1).contiguous()
                     combined_embeddings[video_mask] = video_embeds
@@ -297,7 +307,7 @@ class Qwen3VLModel(MegatronModule):
         else:
             combined_embeddings = None
             visual_pos_masks = None
-            
+
         cu_seqlens_padded = None
         if packed_seq_params is not None:
             if packed_seq_params.cu_seqlens_q_padded is not None:
@@ -306,17 +316,18 @@ class Qwen3VLModel(MegatronModule):
                 cu_seqlens_padded = packed_seq_params.cu_seqlens_q
 
         # to check
-        hf_attention_mask=None
+        hf_attention_mask = None
         if position_ids is None:
             input_ids_for_rope_index = input_ids
             if cu_seqlens_padded is not None:
+
                 def thd_to_bshd(packed_values: torch.Tensor, cu_seqlens: torch.Tensor):
                     seqlens = cu_seqlens[1:] - cu_seqlens[:-1]
                     max_seq_len = seqlens.max()
                     bs = len(cu_seqlens) - 1
                     results = packed_values.new_zeros(size=(bs, max_seq_len, *packed_values.shape[2:]))
                     for i, seqlen in enumerate(seqlens):
-                        results[i, :seqlen] = packed_values[0, cu_seqlens[i]: cu_seqlens[i] + seqlen]
+                        results[i, :seqlen] = packed_values[0, cu_seqlens[i] : cu_seqlens[i] + seqlen]
                     return results
 
                 def bshd_to_thd(unpacked_values: torch.Tensor, cu_seqlens: torch.Tensor):
@@ -324,7 +335,7 @@ class Qwen3VLModel(MegatronModule):
                     total_len = cu_seqlens[-1]
                     results = unpacked_values.new_zeros(size=(1, total_len, *unpacked_values.shape[2:]))
                     for i, seqlen in enumerate(seqlens):
-                        results[0, cu_seqlens[i]: cu_seqlens[i] + seqlen] = unpacked_values[i, :seqlen]
+                        results[0, cu_seqlens[i] : cu_seqlens[i] + seqlen] = unpacked_values[i, :seqlen]
                     return results
 
                 input_ids_for_rope_index = thd_to_bshd(input_ids, cu_seqlens_padded)

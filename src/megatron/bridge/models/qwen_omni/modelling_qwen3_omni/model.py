@@ -18,22 +18,22 @@ from megatron.core import InferenceParams, mpu, tensor_parallel
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec
-
-from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import Qwen3OmniMoeThinkerConfig as Qwen3OmniMoeThinkerConfigHF
-
-
+from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import (
+    Qwen3OmniMoeThinkerConfig as Qwen3OmniMoeThinkerConfigHF,
+)
 from transformers.models.qwen3_omni_moe.modeling_qwen3_omni_moe import (
-    Qwen3OmniMoeVisionEncoder as Qwen3OmniMoeVisionEncoderHF,
     Qwen3OmniMoeAudioEncoder as Qwen3OmniMoeAudioEncoderHF,
 )
-
+from transformers.models.qwen3_omni_moe.modeling_qwen3_omni_moe import (
+    Qwen3OmniMoeVisionEncoder as Qwen3OmniMoeVisionEncoderHF,
+)
 
 from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.text_model import Qwen3OmniGPTModel
 from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.transformer_config import Qwen3OmniTransformerConfig
-from megatron.bridge.models.qwen_vl.modelling_qwen3_vl.utils import split_deepstack_embs
 from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.utils import get_rope_index
-from megatron.bridge.utils.common_utils import hook_hf_module_setattr_for_tp_grad_sync
 from megatron.bridge.models.qwen_vl.modelling_qwen3_vl.model import Qwen3VLModel
+from megatron.bridge.models.qwen_vl.modelling_qwen3_vl.utils import split_deepstack_embs
+from megatron.bridge.utils.common_utils import hook_hf_module_setattr_for_tp_grad_sync
 
 
 class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
@@ -67,10 +67,10 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
         # This attribute is needed to check if an all-reduce is required
         # on the word embeddings inside `finalize_model_grads._allreduce_word_embedding_grads`.
         self.share_embeddings_and_output_weights = False
-        
+
         self.position_id_per_seconds = language_transformer_config.position_id_per_seconds
-        self.audio_token_id=language_transformer_config.audio_token_id
-        self.audio_start_token_id=language_transformer_config.audio_start_token_id
+        self.audio_token_id = language_transformer_config.audio_token_id
+        self.audio_start_token_id = language_transformer_config.audio_start_token_id
         self.use_audio_in_video = use_audio_in_video
         self.audio_model = None
 
@@ -106,7 +106,7 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
             scatter_embedding_sequence_parallel=False,
         )
         self.share_embeddings_and_output_weights = self.language_model.share_embeddings_and_output_weights
-    
+
     def freeze(
         self,
         freeze_language_model: bool,
@@ -216,10 +216,20 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
 
             vision_embeds = None
             if vision_grid_thw is not None and vision_grid_thw.shape[0] > 0:
-                vision_embeds, deepstack_feature_lists = self.vision_model(
+                vision_outputs = self.vision_model(
                     hidden_states=vision_data,
                     grid_thw=vision_grid_thw,
                 )
+
+                import transformers
+                from packaging import version
+
+                if version.parse(transformers.__version__) >= version.parse("5.0.0"):
+                    vision_embeds = vision_outputs.pooler_output
+                    deepstack_feature_lists = vision_outputs.deepstack_features
+                else:
+                    vision_embeds, deepstack_feature_lists = vision_outputs
+
             combined_embeddings = self.language_model.embedding(
                 input_ids=input_ids,
                 position_ids=None,  # NOTE: disable
@@ -245,7 +255,7 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
                     combined_embeddings = combined_embeddings.transpose(0, 1).contiguous()
                     combined_embeddings[image_mask] = image_embeds
                     combined_embeddings = combined_embeddings.transpose(0, 1).contiguous()
-                    
+
                 if video_embeds is not None:
                     combined_embeddings = combined_embeddings.transpose(0, 1).contiguous()
                     combined_embeddings[video_mask] = video_embeds
@@ -265,14 +275,16 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
 
             # =========================
             # Audio
-            # =========================            
+            # =========================
             if input_features is not None:
                 audio_mask = (input_ids == self.audio_token_id).contiguous()
                 if feature_attention_mask is not None:
                     input_features = input_features.permute(0, 2, 1)[feature_attention_mask.bool()].permute(1, 0)
 
-                feature_lens = audio_feature_lengths if audio_feature_lengths is not None else feature_attention_mask.sum(-1)
-                
+                feature_lens = (
+                    audio_feature_lengths if audio_feature_lengths is not None else feature_attention_mask.sum(-1)
+                )
+
                 # dtype from fp32 to bf16
                 audio_outputs = self.audio_model(
                     input_features.to(next(self.audio_model.parameters()).dtype),
@@ -280,7 +292,7 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
                 )
                 audio_embeds = audio_outputs.last_hidden_state  # [num_audio_tokens, hidden]
                 combined_embeddings = combined_embeddings.transpose(0, 1).contiguous()
-                
+
                 combined_embeddings[audio_mask] = audio_embeds
                 combined_embeddings = combined_embeddings.transpose(0, 1).contiguous()
 
@@ -290,7 +302,7 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
         else:
             combined_embeddings = None
             visual_pos_masks = None
-            
+
         cu_seqlens_padded = None
         if packed_seq_params is not None:
             if packed_seq_params.cu_seqlens_q_padded is not None:
@@ -302,13 +314,14 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
         if position_ids is None:
             input_ids_for_rope_index = input_ids
             if cu_seqlens_padded is not None:
+
                 def thd_to_bshd(packed_values: torch.Tensor, cu_seqlens: torch.Tensor):
                     seqlens = cu_seqlens[1:] - cu_seqlens[:-1]
                     max_seq_len = seqlens.max()
                     bs = len(cu_seqlens) - 1
                     results = packed_values.new_zeros(size=(bs, max_seq_len, *packed_values.shape[2:]))
                     for i, seqlen in enumerate(seqlens):
-                        results[i, :seqlen] = packed_values[0, cu_seqlens[i]: cu_seqlens[i] + seqlen]
+                        results[i, :seqlen] = packed_values[0, cu_seqlens[i] : cu_seqlens[i] + seqlen]
                     return results
 
                 def bshd_to_thd(unpacked_values: torch.Tensor, cu_seqlens: torch.Tensor):
@@ -316,7 +329,7 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
                     total_len = cu_seqlens[-1]
                     results = unpacked_values.new_zeros(size=(1, total_len, *unpacked_values.shape[2:]))
                     for i, seqlen in enumerate(seqlens):
-                        results[0, cu_seqlens[i]: cu_seqlens[i] + seqlen] = unpacked_values[i, :seqlen]
+                        results[0, cu_seqlens[i] : cu_seqlens[i] + seqlen] = unpacked_values[i, :seqlen]
                     return results
 
                 input_ids_for_rope_index = thd_to_bshd(input_ids, cu_seqlens_padded)
@@ -368,11 +381,14 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
 
         return output
 
+
 class Qwen3OmniMoeTalkerModel(nn.Module):
     pass
 
+
 class Qwen3OmniMoeCode2Wav(nn.Module):
     pass
+
 
 class Qwen3OmniMoeModel(MegatronModule):
     def __init__(
@@ -412,7 +428,7 @@ class Qwen3OmniMoeModel(MegatronModule):
         if enable_audio_output:
             self.talker = Qwen3OmniMoeTalkerModel()
             self.code2wav = Qwen3OmniMoeCode2Wav()
-        
+
         self.has_talker = False
 
     def __getattr__(self, name):
@@ -424,13 +440,12 @@ class Qwen3OmniMoeModel(MegatronModule):
                 return getattr(thinker, name)
             raise AttributeError(f"{self.__class__.__name__} object has no attribute {name}")
 
-
     def shared_embedding_or_output_weight(self):
         return self.thinker.shared_embedding_or_output_weight()
 
     def set_input_tensor(self, input_tensor) -> None:
         self.thinker.set_input_tensor(input_tensor)
-    
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -450,7 +465,7 @@ class Qwen3OmniMoeModel(MegatronModule):
         # cat set at dataset
         image_input_mask: torch.Tensor = None,
         video_second_per_grid=None,
-    ):  
+    ):
         output = self.thinker(
             input_ids=input_ids,
             input_features=input_features,

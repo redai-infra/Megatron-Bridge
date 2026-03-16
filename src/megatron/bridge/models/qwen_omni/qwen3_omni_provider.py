@@ -25,10 +25,14 @@ from typing import List, Optional
 
 from megatron.core.models.gpt import GPTModel as MCoreGPTModel
 from megatron.core.models.gpt.gpt_layer_specs import get_gpt_layer_with_transformer_engine_spec
-from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import Qwen3OmniMoeThinkerConfig, Qwen3OmniMoeTalkerConfig, Qwen3OmniMoeCode2WavConfig, Qwen3OmniMoeAudioEncoderConfig, Qwen3OmniMoeVisionEncoderConfig, Qwen3OmniMoeTextConfig
+from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import (
+    Qwen3OmniMoeAudioEncoderConfig,
+    Qwen3OmniMoeTextConfig,
+    Qwen3OmniMoeVisionEncoderConfig,
+)
 
 from megatron.bridge.models import Qwen3MoEModelProvider
-from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.model import Qwen3OmniMoeModel, Qwen3OmniMoeThinkerModel
+from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.model import Qwen3OmniMoeModel
 
 
 @dataclass
@@ -52,7 +56,6 @@ class Qwen3OmniModelProvider(Qwen3MoEModelProvider):
     # thinker_config: Qwen3OmniMoeThinkerConfig = field(default_factory=lambda: Qwen3OmniMoeThinkerConfig())
     # talker_config: Qwen3OmniMoeTalkerConfig = field(default_factory=lambda: Qwen3OmniMoeTalkerConfig())
     # code2wav_config: Qwen3OmniMoeCode2WavConfig = field(default_factory=lambda: Qwen3OmniMoeCode2WavConfig())
-
 
     audio_config: Qwen3OmniMoeAudioEncoderConfig = field(default_factory=lambda: Qwen3OmniMoeAudioEncoderConfig())
     vision_config: Qwen3OmniMoeVisionEncoderConfig = field(default_factory=lambda: Qwen3OmniMoeVisionEncoderConfig())
@@ -147,7 +150,9 @@ class Qwen3OmniModelProvider(Qwen3MoEModelProvider):
     def _process_thinker_config(self):
         self.thinker_config.head_dim = self.thinker_config.text_config.head_dim
         self.thinker_config.hidden_size = self.thinker_config.text_config.hidden_size
-        self.thinker_config.language_max_sequence_length = getattr(self.thinker_config.text_config, "language_max_sequence_length", 2048)
+        self.thinker_config.language_max_sequence_length = getattr(
+            self.thinker_config.text_config, "language_max_sequence_length", 2048
+        )
 
         # self.thinker_config.patch_size = self.thinker_config.text_config.patch_size
         # self.thinker_config.temporal_patch_size = self.thinker_config.text_config.temporal_patch_size
@@ -161,7 +166,9 @@ class Qwen3OmniModelProvider(Qwen3MoEModelProvider):
         self.thinker_config.rotary_percent = 1.0
         self.thinker_config.apply_rope_fusion = False
         self.thinker_config.position_embedding_type = "mrope"
-        self.thinker_config.mrope_section = self.thinker_config.text_config.rope_scaling.get("mrope_section", [24, 20, 20])
+        self.thinker_config.mrope_section = self.thinker_config.text_config.rope_scaling.get(
+            "mrope_section", [24, 20, 20]
+        )
         self.thinker_config.rotary_base = self.thinker_config.text_config.rope_theta
 
         # self.thinker_config.audio_token_id = self.thinker_config.text_config.audio_token_id
@@ -206,7 +213,6 @@ class Qwen3OmniModelProvider(Qwen3MoEModelProvider):
         self.thinker_config.distribute_saved_activations = False
         self.thinker_config.cp_comm_type = "p2p"
 
-
     def finalize(self) -> None:
         if self.tensor_model_parallel_size > 1:
             self.sequence_parallel = True
@@ -241,7 +247,7 @@ class Qwen3OmniModelProvider(Qwen3MoEModelProvider):
             vision_transformer_config=vision_config_hf,
             pre_process=pre_process,
             post_process=post_process,
-            use_audio_in_video=self.use_audio_in_video
+            use_audio_in_video=self.use_audio_in_video,
         )
 
         # Apply freeze options if any are enabled for fine-tuning
@@ -250,7 +256,7 @@ class Qwen3OmniModelProvider(Qwen3MoEModelProvider):
                 freeze_language_model=self.freeze_language_model,
                 freeze_vision_model=self.freeze_vision_model,
                 freeze_vision_projection=self.freeze_vision_projection,
-                freeze_audio_model=self.freeze_audio_model
+                freeze_audio_model=self.freeze_audio_model,
             )
 
         return model

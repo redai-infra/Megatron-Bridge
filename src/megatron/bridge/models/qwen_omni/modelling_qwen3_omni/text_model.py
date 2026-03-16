@@ -15,20 +15,12 @@
 
 from typing import Literal, Optional
 
-import torch
-from megatron.core.inference.contexts import BaseInferenceContext
-from megatron.core.models.gpt.gpt_model import GPTModel
-from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.spec_utils import ModuleSpec
-from megatron.core.utils import deprecate_inference_params
-from torch import Tensor
 
 from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.rope import Qwen3OmniMoeThinkerTextRotaryEmbedding
-
 from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.transformer_block import Qwen3OmniTransformerBlock
-from megatron.bridge.models.transformer_config import TransformerConfig
 from megatron.bridge.models.qwen_vl.modelling_qwen3_vl.text_model import Qwen3VLGPTModel
-
+from megatron.bridge.models.transformer_config import TransformerConfig
 
 
 class Qwen3OmniGPTModel(Qwen3VLGPTModel):
@@ -77,7 +69,6 @@ class Qwen3OmniGPTModel(Qwen3VLGPTModel):
         )
 
         self.rotary_pos_emb = Qwen3OmniMoeThinkerTextRotaryEmbedding(config.hf_text_config)
-
 
         self.mrope_section = self.config.mrope_section
         assert self.mrope_section is not None, (
