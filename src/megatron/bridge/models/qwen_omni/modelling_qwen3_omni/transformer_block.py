@@ -13,19 +13,7 @@
 # limitations under the License.
 
 
-from contextlib import nullcontext
-from typing import Optional, Union
-
-import torch
-from megatron.core import parallel_state, tensor_parallel
-from megatron.core.enums import Fp8Recipe
-from megatron.core.fp8_utils import get_fp8_context
-from megatron.core.inference.contexts import BaseInferenceContext
-from megatron.core.packed_seq_params import PackedSeqParams
-from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.bridge.models.qwen_vl.modelling_qwen3_vl.transformer_block import Qwen3VLTransformerBlock
-from megatron.core.utils import WrappedTensor, deprecate_inference_params, make_viewless_tensor
-from torch import Tensor
 
 
 try:
@@ -37,7 +25,7 @@ except ImportError:
 
 te_checkpoint = None
 if HAVE_TE:
-    from megatron.core.extensions.transformer_engine import te_checkpoint
+    pass
 
 
 class Qwen3OmniTransformerBlock(Qwen3VLTransformerBlock):

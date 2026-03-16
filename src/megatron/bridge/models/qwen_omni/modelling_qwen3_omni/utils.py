@@ -3,6 +3,7 @@ from typing import Optional
 import torch
 from megatron.core.packed_seq_params import PackedSeqParams
 
+
 def _get_feat_extract_output_lengths(input_lengths):
     """
     Computes the output length of the convolutional layers and the output length of the audio encoder
@@ -12,6 +13,7 @@ def _get_feat_extract_output_lengths(input_lengths):
     feat_lengths = (input_lengths_leave - 1) // 2 + 1
     output_lengths = ((feat_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
     return output_lengths
+
 
 def get_llm_pos_ids_for_vision(
     self,
@@ -33,6 +35,7 @@ def get_llm_pos_ids_for_vision(
     llm_pos_ids = torch.cat(llm_pos_ids_list, dim=1)
     return llm_pos_ids
 
+
 def get_rope_index(
     spatial_merge_size: int,
     image_token_id: int,
@@ -50,7 +53,6 @@ def get_rope_index(
     position_id_per_seconds: int = 1,
     packed_seq_params: Optional[PackedSeqParams] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-
     # VL timestamp split logic (unchanged)
     if video_grid_thw is not None:
         video_grid_thw = torch.repeat_interleave(video_grid_thw, video_grid_thw[:, 0], dim=0)
@@ -72,7 +74,9 @@ def get_rope_index(
             attention_mask = torch.ones_like(input_ids)
 
     mrope_position_deltas = []
-    if input_ids is not None and (image_grid_thw is not None or video_grid_thw is not None or audio_seqlens is not None):
+    if input_ids is not None and (
+        image_grid_thw is not None or video_grid_thw is not None or audio_seqlens is not None
+    ):
         total_input_ids = input_ids
         if attention_mask is None:
             attention_mask = torch.ones_like(total_input_ids)
@@ -87,7 +91,6 @@ def get_rope_index(
         attention_mask = attention_mask.to(total_input_ids.device)
         for i, input_ids in enumerate(total_input_ids):
             input_ids = input_ids[attention_mask[i] == 1]
-            
 
             vision_start_indices = torch.argwhere(input_ids == vision_start_token_id).squeeze(1)
             vision_tokens = input_ids[vision_start_indices + 1]
@@ -102,9 +105,7 @@ def get_rope_index(
             llm_pos_ids_list: list = []
             st = 0
             remain_images, remain_videos, remain_audios = image_nums, video_nums, audio_nums
-            multimodal_nums = (
-                image_nums + audio_nums if use_audio_in_video else image_nums + video_nums + audio_nums
-            )
+            multimodal_nums = image_nums + audio_nums if use_audio_in_video else image_nums + video_nums + audio_nums
 
             for _ in range(multimodal_nums):
                 st_idx = llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
@@ -159,8 +160,12 @@ def get_rope_index(
                     llm_pos_ids_list_temp = []
                     llm_grid_h = h // spatial_merge_size
                     llm_grid_w = w // spatial_merge_size
-                    h_index = torch.arange(llm_grid_h).view(1, -1, 1).expand(len(t_index), -1, llm_grid_w).flatten().float()
-                    w_index = torch.arange(llm_grid_w).view(1, 1, -1).expand(len(t_index), llm_grid_h, -1).flatten().float()
+                    h_index = (
+                        torch.arange(llm_grid_h).view(1, -1, 1).expand(len(t_index), -1, llm_grid_w).flatten().float()
+                    )
+                    w_index = (
+                        torch.arange(llm_grid_w).view(1, 1, -1).expand(len(t_index), llm_grid_h, -1).flatten().float()
+                    )
                     t_index = torch.Tensor(t_index).view(-1, 1).expand(-1, llm_grid_h * llm_grid_w).flatten().float()
                     _llm_pos_ids = torch.stack([t_index, h_index, w_index])
                     llm_pos_ids_list_temp.append(_llm_pos_ids + st_idx)
@@ -173,7 +178,7 @@ def get_rope_index(
                     image_index += 1
                     remain_images -= 1
 
-                # Video Only    
+                # Video Only
                 elif min_ed == ed_vision_start and input_ids[ed_vision_start + 1] == video_token_id:
                     t, h, w = (
                         video_grid_thw[video_index][0],
@@ -181,14 +186,18 @@ def get_rope_index(
                         video_grid_thw[video_index][2],
                     )
                     t_index = (
-                            torch.arange(t) * second_per_grids[video_index].cpu().float() * position_id_per_seconds
-                        ).float()
-                    
+                        torch.arange(t) * second_per_grids[video_index].cpu().float() * position_id_per_seconds
+                    ).float()
+
                     llm_pos_ids_list_temp = []
                     llm_grid_h = h // spatial_merge_size
                     llm_grid_w = w // spatial_merge_size
-                    h_index = torch.arange(llm_grid_h).view(1, -1, 1).expand(len(t_index), -1, llm_grid_w).flatten().float()
-                    w_index = torch.arange(llm_grid_w).view(1, 1, -1).expand(len(t_index), llm_grid_h, -1).flatten().float()
+                    h_index = (
+                        torch.arange(llm_grid_h).view(1, -1, 1).expand(len(t_index), -1, llm_grid_w).flatten().float()
+                    )
+                    w_index = (
+                        torch.arange(llm_grid_w).view(1, 1, -1).expand(len(t_index), llm_grid_h, -1).flatten().float()
+                    )
                     t_index = torch.Tensor(t_index).view(-1, 1).expand(-1, llm_grid_h * llm_grid_w).flatten().float()
                     _llm_pos_ids = torch.stack([t_index, h_index, w_index])
                     llm_pos_ids_list_temp.append(_llm_pos_ids + st_idx)
@@ -216,17 +225,19 @@ def get_rope_index(
                         torch.arange(t) * second_per_grids[video_index].cpu().float() * position_id_per_seconds
                     ).float()
 
-
                     llm_pos_ids_list_temp = []
                     llm_grid_h = h // spatial_merge_size
                     llm_grid_w = w // spatial_merge_size
-                    h_index = torch.arange(llm_grid_h).view(1, -1, 1).expand(len(t_index), -1, llm_grid_w).flatten().float()
-                    w_index = torch.arange(llm_grid_w).view(1, 1, -1).expand(len(t_index), llm_grid_h, -1).flatten().float()
+                    h_index = (
+                        torch.arange(llm_grid_h).view(1, -1, 1).expand(len(t_index), -1, llm_grid_w).flatten().float()
+                    )
+                    w_index = (
+                        torch.arange(llm_grid_w).view(1, 1, -1).expand(len(t_index), llm_grid_h, -1).flatten().float()
+                    )
                     t_index = torch.Tensor(t_index).view(-1, 1).expand(-1, llm_grid_h * llm_grid_w).flatten().float()
                     _llm_pos_ids = torch.stack([t_index, h_index, w_index])
                     llm_pos_ids_list_temp.append(_llm_pos_ids + st_idx)
                     llm_pos_ids = torch.cat(llm_pos_ids_list_temp, dim=1)
-
 
                     video_llm_pos_ids = llm_pos_ids
 
@@ -242,13 +253,9 @@ def get_rope_index(
                             llm_pos_ids_list.append(audio_llm_pos_ids[:, audio_data_index : audio_data_index + 1])
                             audio_data_index += 1
                     if video_data_index < video_llm_pos_ids.shape[-1]:
-                        llm_pos_ids_list.append(
-                            video_llm_pos_ids[:, video_data_index : video_llm_pos_ids.shape[-1]]
-                        )
+                        llm_pos_ids_list.append(video_llm_pos_ids[:, video_data_index : video_llm_pos_ids.shape[-1]])
                     if audio_data_index < audio_llm_pos_ids.shape[-1]:
-                        llm_pos_ids_list.append(
-                            audio_llm_pos_ids[:, audio_data_index : audio_llm_pos_ids.shape[-1]]
-                        )
+                        llm_pos_ids_list.append(audio_llm_pos_ids[:, audio_data_index : audio_llm_pos_ids.shape[-1]])
                     video_len = video_grid_thw[video_index].prod() // (spatial_merge_size**2)
 
                     st += int(text_len + bos_len + audio_len + video_len + eos_len)
@@ -257,7 +264,7 @@ def get_rope_index(
                     remain_videos -= 1
                     remain_audios -= 1
                 else:
-                    raise(RuntimeError("unexpected error"))
+                    raise (RuntimeError("unexpected error"))
 
                 # ---------- EOS ----------
                 st_idx = llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0

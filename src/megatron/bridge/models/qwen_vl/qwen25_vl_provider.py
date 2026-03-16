@@ -60,6 +60,8 @@ class Qwen25VLModelProvider(Qwen2ModelProvider):
     freeze_vision_model: bool = False
     freeze_vision_projection: bool = False
 
+    use_hf_vision_model: bool = False
+
     def provide(self, pre_process=None, post_process=None, vp_stage=None) -> Qwen25VLModel:
         model = Qwen25VLModel(self, pre_process=pre_process, post_process=post_process, vp_stage=vp_stage)
 

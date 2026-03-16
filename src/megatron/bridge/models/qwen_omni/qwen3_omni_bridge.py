@@ -12,29 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-from typing import Dict, Union
 
 import torch
-import torch.nn as nn
-from megatron.core import parallel_state
 from transformers import Qwen3OmniMoeForConditionalGeneration
 
 from megatron.bridge.models.conversion.mapping_registry import MegatronMappingRegistry
-from megatron.bridge.models.conversion.model_bridge import MegatronModelBridge, WeightConversionTask
-from megatron.bridge.models.conversion.param_mapping import (
-    AutoMapping,
-    QKVMapping,
-    ReplicatedMapping,
-    GatedMLPMapping
-)
+from megatron.bridge.models.conversion.model_bridge import MegatronModelBridge
+from megatron.bridge.models.conversion.param_mapping import AutoMapping, GatedMLPMapping, QKVMapping, ReplicatedMapping
 from megatron.bridge.models.hf_pretrained.vlm import PreTrainedVLM
-from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.model import Qwen3OmniMoeModel, Qwen3OmniMoeThinkerModel
+from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.model import Qwen3OmniMoeModel
 from megatron.bridge.models.qwen_omni.qwen3_omni_provider import Qwen3OmniModelProvider
-
-
-from megatron.bridge.utils.common_utils import extract_expert_number_from_param
-
 
 
 @MegatronModelBridge.register_bridge(source=Qwen3OmniMoeForConditionalGeneration, target=Qwen3OmniMoeModel)
@@ -142,7 +129,6 @@ class Qwen3OmniMoEBridge(MegatronModelBridge):
         )
 
         return provider
-
 
     def mapping_registry(self) -> MegatronMappingRegistry:
         """
