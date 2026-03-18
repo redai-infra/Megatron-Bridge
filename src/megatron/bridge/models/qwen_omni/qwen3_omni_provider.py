@@ -32,6 +32,7 @@ from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import (
 )
 
 from megatron.bridge.models import Qwen3MoEModelProvider
+from megatron.bridge.models.conversion.transformers_compat import rope_theta_from_hf
 from megatron.bridge.models.qwen_omni.modelling_qwen3_omni.model import Qwen3OmniMoeModel
 
 
@@ -169,7 +170,7 @@ class Qwen3OmniModelProvider(Qwen3MoEModelProvider):
         self.thinker_config.mrope_section = self.thinker_config.text_config.rope_scaling.get(
             "mrope_section", [24, 20, 20]
         )
-        self.thinker_config.rotary_base = self.thinker_config.text_config.rope_theta
+        self.thinker_config.rotary_base = rope_theta_from_hf(self.thinker_config.text_config)
 
         # self.thinker_config.audio_token_id = self.thinker_config.text_config.audio_token_id
         # self.thinker_config.audio_start_token_id = self.thinker_config.text_config.audio_start_token_id

@@ -22,6 +22,7 @@ from megatron.bridge.models.conversion.param_mapping import (
     AutoMapping,
     QKVMapping,
 )
+from megatron.bridge.models.conversion.transformers_compat import rope_theta_from_hf
 from megatron.bridge.models.hf_pretrained.causal_lm import PreTrainedCausalLM
 from megatron.bridge.models.nemotron.nemotron_provider import NemotronModelProvider
 
@@ -51,7 +52,7 @@ class NemotronBridge(MegatronModelBridge):
             layernorm_epsilon=hf_config.norm_eps,
             num_query_groups=hf_config.num_key_value_heads,
             seq_length=hf_config.max_position_embeddings,
-            rotary_base=hf_config.rope_theta,
+            rotary_base=rope_theta_from_hf(hf_config),
             rotary_percent=hf_config.partial_rotary_factor,
             kv_channels=getattr(hf_config, "head_dim", None),
             make_vocab_size_divisible_by=self.make_vocab_size_divisible_by(hf_config.vocab_size),

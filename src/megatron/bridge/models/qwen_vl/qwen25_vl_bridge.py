@@ -23,6 +23,7 @@ from megatron.bridge.models.conversion.param_mapping import (
     QKVMapping,
     ReplicatedMapping,
 )
+from megatron.bridge.models.conversion.transformers_compat import rope_theta_from_hf
 from megatron.bridge.models.hf_pretrained.vlm import PreTrainedVLM
 from megatron.bridge.models.qwen_vl.modeling_qwen25_vl import Qwen25VLModel
 from megatron.bridge.models.qwen_vl.qwen25_vl_provider import Qwen25VLModelProvider
@@ -56,7 +57,7 @@ class Qwen25VLBridge(MegatronModelBridge):
             layernorm_epsilon=hf_config.rms_norm_eps,
             gated_linear_unit=True,
             make_vocab_size_divisible_by=self.make_vocab_size_divisible_by(hf_config.vocab_size),
-            rotary_base=hf_config.rope_theta,
+            rotary_base=rope_theta_from_hf(hf_config),
             share_embeddings_and_output_weights=getattr(hf_config, "tie_word_embeddings", False),
             vocab_size=hf_config.vocab_size,
             seq_length=hf_config.max_position_embeddings,

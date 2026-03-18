@@ -37,6 +37,13 @@ from megatron.bridge.utils.common_utils import hook_hf_module_setattr_for_tp_gra
 
 
 class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
+    """Qwen3 Omni MoE Thinker Model for multimodal understanding.
+
+    This model extends Qwen3VLModel to support audio, image, and video inputs
+    in addition to text. It processes multimodal inputs through separate encoders
+    and combines them for the language model.
+    """
+
     def __init__(
         self,
         language_transformer_config: Qwen3OmniTransformerConfig,
@@ -383,14 +390,32 @@ class Qwen3OmniMoeThinkerModel(Qwen3VLModel):
 
 
 class Qwen3OmniMoeTalkerModel(nn.Module):
+    """Qwen3 Omni MoE Talker Model for audio generation.
+
+    This model is responsible for generating audio outputs from the language model.
+    Currently a placeholder for future implementation.
+    """
+
     pass
 
 
 class Qwen3OmniMoeCode2Wav(nn.Module):
+    """Qwen3 Omni MoE Code-to-Waveform converter.
+
+    This model converts discrete audio codes to waveform for audio generation.
+    Currently a placeholder for future implementation.
+    """
+
     pass
 
 
 class Qwen3OmniMoeModel(MegatronModule):
+    """Qwen3 Omni MoE Model combining thinker, talker, and code2wav components.
+
+    This is the main model that orchestrates the thinker (understanding) and
+    talker (generation) components for multimodal input/output processing.
+    """
+
     def __init__(
         self,
         language_transformer_config: Qwen3OmniTransformerConfig,
