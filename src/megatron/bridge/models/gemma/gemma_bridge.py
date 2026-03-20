@@ -23,6 +23,7 @@ from megatron.bridge.models.conversion.param_mapping import (
     GatedMLPMapping,
     QKVMapping,
 )
+from megatron.bridge.models.conversion.transformers_compat import rope_theta_from_hf
 from megatron.bridge.models.gemma.gemma_provider import GemmaModelProvider
 from megatron.bridge.models.hf_pretrained.causal_lm import PreTrainedCausalLM
 
@@ -65,7 +66,7 @@ class GemmaBridge(MegatronModelBridge):
             layernorm_epsilon=hf_config.rms_norm_eps,
             gated_linear_unit=True,
             make_vocab_size_divisible_by=self.make_vocab_size_divisible_by(hf_config.vocab_size),
-            rotary_base=hf_config.rope_theta,
+            rotary_base=rope_theta_from_hf(hf_config),
             share_embeddings_and_output_weights=getattr(hf_config, "tie_word_embeddings", True),
             vocab_size=hf_config.vocab_size,
             seq_length=hf_config.max_position_embeddings,

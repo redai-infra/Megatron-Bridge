@@ -24,6 +24,23 @@ def get_llm_pos_ids_for_vision(
     grid_hs: list[torch.Tensor],
     grid_ws: list[torch.Tensor],
 ):
+    """Generate LLM position IDs for vision tokens.
+
+    Computes position embeddings for vision tokens (images/videos) by creating
+    3D position indices (temporal, height, width) based on spatial merge size.
+
+    Args:
+        self: Instance reference.
+        start_idx: Starting position index offset.
+        vision_idx: Index of the vision sample.
+        spatial_merge_size: Size of spatial merge for grid downsampling.
+        t_index: List of temporal indices.
+        grid_hs: List of grid heights.
+        grid_ws: List of grid widths.
+
+    Returns:
+        torch.Tensor: Position IDs of shape [3, num_tokens] with temporal, height, width indices.
+    """
     llm_pos_ids_list = []
     llm_grid_h = grid_hs[vision_idx] // spatial_merge_size
     llm_grid_w = grid_ws[vision_idx] // spatial_merge_size
@@ -53,6 +70,34 @@ def get_rope_index(
     position_id_per_seconds: int = 1,
     packed_seq_params: Optional[PackedSeqParams] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    """Generate RoPE position indices for multimodal inputs.
+
+    Computes rotary position embeddings (RoPE) indices for a sequence containing
+    mixed modalities (text, images, videos, audio). Handles temporal, spatial,
+    and audio-specific position encoding.
+
+    Args:
+        spatial_merge_size: Size of spatial merge for grid downsampling.
+        image_token_id: Token ID for image markers.
+        video_token_id: Token ID for video markers.
+        audio_token_id: Token ID for audio markers.
+        vision_start_token_id: Token ID marking start of vision content.
+        audio_start_token_id: Token ID marking start of audio content.
+        input_ids: Input token IDs of shape [batch_size, seq_len].
+        image_grid_thw: Image grid dimensions [num_images, 3] with (T, H, W).
+        video_grid_thw: Video grid dimensions [num_videos, 3] with (T, H, W).
+        audio_seqlens: Audio sequence lengths [num_audios].
+        attention_mask: Attention mask indicating valid tokens.
+        use_audio_in_video: Whether audio is embedded within video tokens.
+        second_per_grids: Seconds per video grid frame.
+        position_id_per_seconds: Position ID increment per second.
+        packed_seq_params: Packed sequence parameters for variable-length sequences.
+
+    Returns:
+        tuple: (position_ids, mrope_position_deltas) where:
+            - position_ids: Shape [3, batch_size, seq_len] with temporal, height, width indices.
+            - mrope_position_deltas: Shape [batch_size, 1] with position delta adjustments.
+    """
     # VL timestamp split logic (unchanged)
     if video_grid_thw is not None:
         video_grid_thw = torch.repeat_interleave(video_grid_thw, video_grid_thw[:, 0], dim=0)

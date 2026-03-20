@@ -28,6 +28,7 @@ from megatron.bridge.models.conversion.param_mapping import (
     QKVMapping,
     ReplicatedMapping,
 )
+from megatron.bridge.models.conversion.transformers_compat import rope_theta_from_hf
 from megatron.bridge.models.hf_pretrained.vlm import PreTrainedVLM
 from megatron.bridge.models.qwen_vl.modelling_qwen3_vl.model import Qwen3VLModel
 from megatron.bridge.models.qwen_vl.qwen3_vl_provider import Qwen3VLModelProvider, Qwen3VLMoEModelProvider
@@ -90,7 +91,7 @@ class Qwen3VLBridge(MegatronModelBridge):
             layernorm_epsilon=text_config.rms_norm_eps,
             gated_linear_unit=True,  # Qwen3 uses gated linear units
             make_vocab_size_divisible_by=self.make_vocab_size_divisible_by(text_config.vocab_size),
-            rotary_base=text_config.rope_theta,
+            rotary_base=rope_theta_from_hf(text_config),
             share_embeddings_and_output_weights=getattr(text_config, "tie_word_embeddings", False),
             vocab_size=text_config.vocab_size,
             seq_length=text_config.max_position_embeddings,
@@ -256,7 +257,7 @@ class Qwen3VLMoEBridge(MegatronModelBridge):
             layernorm_epsilon=text_config.rms_norm_eps,
             gated_linear_unit=True,  # Qwen3 MoE uses gated linear units
             make_vocab_size_divisible_by=self.make_vocab_size_divisible_by(text_config.vocab_size),
-            rotary_base=getattr(text_config, "rope_theta", 5000000.0),  # Default Qwen3 rope theta
+            rotary_base=rope_theta_from_hf(text_config),
             share_embeddings_and_output_weights=getattr(text_config, "tie_word_embeddings", False),
             vocab_size=text_config.vocab_size,
             seq_length=text_config.max_position_embeddings,

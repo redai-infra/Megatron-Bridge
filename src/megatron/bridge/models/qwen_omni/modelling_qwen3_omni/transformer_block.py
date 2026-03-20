@@ -29,4 +29,10 @@ if HAVE_TE:
 
 
 class Qwen3OmniTransformerBlock(Qwen3VLTransformerBlock):
+    """Qwen3 Omni Transformer Block extending Qwen3VL functionality.
+
+    This block extends the Qwen3VL transformer block with Omni-specific features
+    for handling multimodal inputs including audio, images, and videos.
+    """
+
     pass

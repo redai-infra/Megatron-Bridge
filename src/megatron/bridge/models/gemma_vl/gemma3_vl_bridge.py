@@ -25,6 +25,10 @@ from megatron.bridge.models.conversion.param_mapping import (
     QKVMapping,
     ReplicatedMapping,
 )
+from megatron.bridge.models.conversion.transformers_compat import (
+    rope_local_base_freq_from_hf,
+    rope_theta_from_hf,
+)
 from megatron.bridge.models.gemma_vl.gemma3_vl_provider import Gemma3VLModelProvider
 from megatron.bridge.models.gemma_vl.modeling_gemma3_vl import Gemma3VLModel
 from megatron.bridge.models.hf_pretrained.vlm import PreTrainedVLM
@@ -52,7 +56,7 @@ class Gemma3VLBridge(MegatronModelBridge):
             num_layers=text_config.num_hidden_layers,
             num_query_groups=text_config.num_key_value_heads,
             window_size=text_config.sliding_window,
-            rotary_base=(text_config.rope_local_base_freq, text_config.rope_theta),
+            rotary_base=(rope_local_base_freq_from_hf(text_config), rope_theta_from_hf(text_config)),
             layernorm_epsilon=text_config.rms_norm_eps,
             vocab_size=text_config.vocab_size,
             softmax_scale=1.0 / math.sqrt(text_config.query_pre_attn_scalar),
