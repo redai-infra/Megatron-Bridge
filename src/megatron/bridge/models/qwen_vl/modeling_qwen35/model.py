@@ -375,7 +375,7 @@ class Qwen35VLModel(MegatronModule):
                 combined_embeddings = split_data_cp_rank(combined_embeddings, cp_size, 0, cp_rank)
             if packed_seq_params is not None:
                 if attention_mask is None:
-                    attention_mask = torch.ones_like(input_ids, dtype=torch.int32, device=input_ids.device)
+                    attention_mask = torch.ones_like(input_ids, dtype=torch.bool, device=input_ids.device)
                 input_ids_thd, _ = preprocess_packed_seqs(
                     input_ids, attention_mask, pre_process=True, pg_collection=self.pg_collection
                 )
@@ -426,6 +426,9 @@ class Qwen35VLModel(MegatronModule):
 
         else:
             combined_embeddings = None
+            if packed_seq_params is not None:
+                if attention_mask is None:
+                    attention_mask = torch.ones_like(input_ids, dtype=torch.bool, device=input_ids.device)
 
         visual_pos_masks = vision_mask
         deepstack_visual_embeds = deepstack_feature_lists
@@ -453,6 +456,9 @@ class Qwen35VLModel(MegatronModule):
 
         if position_ids is None:
             # BSHD
+            # Megatron uses 4D bool masks ([B|1,1,S,S], True=masked); HF uses 2D keep masks ([B,S], 1=keep)
+            # For simplicity, we set hf_attention_mask to None.
+            hf_attention_mask = None
             position_ids, _ = get_rope_index(
                 self.config.spatial_merge_size,
                 self.image_token_id,
@@ -461,7 +467,7 @@ class Qwen35VLModel(MegatronModule):
                 input_ids,
                 image_grid_thw=image_grid_thw,
                 video_grid_thw=video_grid_thw,
-                attention_mask=attention_mask,
+                attention_mask=hf_attention_mask,
             )  #  [3*b*s]
             if packed_seq_params is not None:
                 # convert position_ids to THD format
