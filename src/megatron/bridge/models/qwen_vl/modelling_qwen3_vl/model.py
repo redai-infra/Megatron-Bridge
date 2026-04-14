@@ -171,6 +171,77 @@ class Qwen3VLModel(MegatronModule):
             for param in module.parameters():
                 param.requires_grad = False
 
+    def _vision_forward_tp_split(
+        self,
+        vision_data: torch.Tensor,
+        vision_grid_thw: torch.Tensor,
+    ):
+        """Run vision encoder with workload split across TP ranks.
+
+        Each TP rank processes a subset of images determined by splitting
+        ``vision_grid_thw``, then the partial embeddings are all-reduced so
+        every rank holds the complete result.
+        """
+        import transformers
+        from packaging import version
+
+        tp_rank = mpu.get_tensor_model_parallel_rank()
+        tp_size = mpu.get_tensor_model_parallel_world_size()
+
+        grid_thw_chunks = vision_grid_thw.chunk(tp_size)
+        pixel_counts_per_chunk = torch.tensor(
+            [chunk.prod(dim=-1).sum() for chunk in grid_thw_chunks],
+            device=vision_data.device,
+        )
+        pixel_cumsum = pixel_counts_per_chunk.cumsum(dim=0)
+
+        merge_size_sq = self.vision_model.spatial_merge_unit
+        out_hidden = self.vision_model.config.out_hidden_size
+        num_deepstack = len(self.vision_model.deepstack_visual_indexes)
+
+        total_merged_tokens = vision_data.shape[0] // merge_size_sq
+        param_dtype = next(self.vision_model.parameters()).dtype
+        vision_embeds = torch.zeros(
+            (total_merged_tokens, out_hidden),
+            device=vision_data.device,
+            dtype=param_dtype,
+        )
+        deepstack_feature_lists = [
+            torch.zeros((total_merged_tokens, out_hidden), device=vision_data.device, dtype=param_dtype)
+            for _ in range(num_deepstack)
+        ]
+
+        if tp_rank < len(grid_thw_chunks):
+            px_start = 0 if tp_rank == 0 else pixel_cumsum[tp_rank - 1].item()
+            px_end = pixel_cumsum[tp_rank].item()
+            merged_start = px_start // merge_size_sq
+            merged_end = px_end // merge_size_sq
+
+            vision_data_part = vision_data[px_start:px_end]
+            grid_thw_part = grid_thw_chunks[tp_rank]
+
+            vision_outputs = self.vision_model(
+                hidden_states=vision_data_part,
+                grid_thw=grid_thw_part,
+            )
+
+            if version.parse(transformers.__version__) >= version.parse("5.0.0"):
+                embeds_part = vision_outputs.pooler_output
+                deepstack_parts = vision_outputs.deepstack_features
+            else:
+                embeds_part, deepstack_parts = vision_outputs
+
+            vision_embeds[merged_start:merged_end] = embeds_part
+            for i, ds_part in enumerate(deepstack_parts):
+                deepstack_feature_lists[i][merged_start:merged_end] = ds_part
+
+        tp_group = mpu.get_tensor_model_parallel_group()
+        torch.distributed.all_reduce(vision_embeds, group=tp_group)
+        for ds_feat in deepstack_feature_lists:
+            torch.distributed.all_reduce(ds_feat, group=tp_group)
+
+        return vision_embeds, deepstack_feature_lists
+
     def forward(
         self,
         input_ids: torch.Tensor,
@@ -244,19 +315,26 @@ class Qwen3VLModel(MegatronModule):
 
             vision_embeds = None
             if vision_grid_thw is not None and vision_grid_thw.shape[0] > 0:
-                vision_outputs = self.vision_model(
-                    hidden_states=vision_data,
-                    grid_thw=vision_grid_thw,
-                )
-
-                import transformers
-                from packaging import version
-
-                if version.parse(transformers.__version__) >= version.parse("5.0.0"):
-                    vision_embeds = vision_outputs.pooler_output
-                    deepstack_feature_lists = vision_outputs.deepstack_features
+                tp_size = mpu.get_tensor_model_parallel_world_size()
+                if self.config.vision_dp_when_tp and tp_size > 1:
+                    vision_embeds, deepstack_feature_lists = self._vision_forward_tp_split(
+                        vision_data,
+                        vision_grid_thw,
+                    )
                 else:
-                    vision_embeds, deepstack_feature_lists = vision_outputs
+                    vision_outputs = self.vision_model(
+                        hidden_states=vision_data,
+                        grid_thw=vision_grid_thw,
+                    )
+
+                    import transformers
+                    from packaging import version
+
+                    if version.parse(transformers.__version__) >= version.parse("5.0.0"):
+                        vision_embeds = vision_outputs.pooler_output
+                        deepstack_feature_lists = vision_outputs.deepstack_features
+                    else:
+                        vision_embeds, deepstack_feature_lists = vision_outputs
 
             combined_embeddings = self.language_model.embedding(
                 input_ids=input_ids,
