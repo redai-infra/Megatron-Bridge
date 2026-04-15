@@ -49,3 +49,7 @@ class Qwen3VLTransformerConfig(TransformerConfig):
     video_token_id: int = 151656
     vision_start_token_id: int = 151652
     hf_text_config: Optional[Qwen3VLTextConfig] = None
+
+    # When True, split vision encoder workload across TP ranks (data-parallel over TP)
+    # Each TP rank processes a chunk of images, then all-reduce gathers the full embedding.
+    vision_dp_when_tp: bool = False

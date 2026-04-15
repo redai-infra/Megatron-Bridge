@@ -106,6 +106,8 @@ class Qwen3VLModelProvider(Qwen3ModelProvider):
 
     qk_layernorm: bool = True
 
+    vision_dp_when_tp: bool = False
+
     def provide(self, pre_process=None, post_process=None, vp_stage=None):
         """
         Provide a Qwen3VL model instance with vision and language components.
@@ -255,6 +257,8 @@ class Qwen3VLMoEModelProvider(Qwen3MoEModelProvider):
     async_tensor_model_parallel_allreduce: bool = True  # Async tensor parallel
     distribute_saved_activations: bool = False  # Don't distribute saved activations
     cp_comm_type: str = "p2p"  # Point-to-point communication for context parallel
+
+    vision_dp_when_tp: bool = False
 
     def finalize(self) -> None:
         if self.tensor_model_parallel_size > 1:
